@@ -1,0 +1,13 @@
+target/
+**/target/
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+*.log
+logs/
+.DS_Store
+Thumbs.db
+hs_err_pid*
+replay_pid*
