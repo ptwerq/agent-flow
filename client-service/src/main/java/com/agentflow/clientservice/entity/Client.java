@@ -38,11 +38,8 @@ public class Client {
 
     @Column(name = "deal_status", nullable = false)
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     private DealStatus dealStatus = DealStatus.NEW;
-
-    @Column(name = "service_type", nullable = false)
-    @Enumerated(EnumType.STRING)
-    private ServiceType serviceType;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false)

@@ -1,12 +1,13 @@
-package com.agentflow.clientservice.dto;
+package com.agentflow.clientservice.dto.request;
 
 import com.agentflow.clientservice.entity.DealStatus;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
-@Getter
-@Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ClientStatusUpdateRequest {
     @NotNull(message = "Deal status is required")
     private DealStatus dealStatus;

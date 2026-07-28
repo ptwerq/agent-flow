@@ -1,9 +1,9 @@
 package com.agentflow.clientservice.controller;
 
-import com.agentflow.clientservice.dto.ClientRequest;
-import com.agentflow.clientservice.dto.ClientResponse;
-import com.agentflow.clientservice.dto.ClientStatusUpdateRequest;
-import com.agentflow.clientservice.dto.ClientUpdateRequest;
+import com.agentflow.clientservice.dto.request.ClientRequest;
+import com.agentflow.clientservice.dto.response.ClientResponse;
+import com.agentflow.clientservice.dto.request.ClientStatusUpdateRequest;
+import com.agentflow.clientservice.dto.request.ClientUpdateRequest;
 import com.agentflow.clientservice.service.ClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

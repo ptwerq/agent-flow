@@ -1,14 +1,14 @@
-package com.agentflow.clientservice.dto;
+package com.agentflow.clientservice.dto.response;
 
 import com.agentflow.clientservice.entity.DealStatus;
-import com.agentflow.clientservice.entity.ServiceType;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ClientResponse {
     private Long id;
     private String firstName;
@@ -17,7 +17,6 @@ public class ClientResponse {
     private String phone;
     private Long managerId;
     private DealStatus dealStatus;
-    private ServiceType serviceType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
