@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agentflow_clients_db
+    username: user
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+      kafka:
+        bootstrap-servers: localhost:9092
+        producer:
+          key-serializer: org.apache.kafka.common.serialization.StringSerializer
+          value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+          properties:
+            spring.json.add.type.headers: false
