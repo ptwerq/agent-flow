@@ -7,9 +7,12 @@ import com.agentflow.clientservice.dto.response.ClientResponse;
 import com.agentflow.clientservice.dto.request.ClientStatusUpdateRequest;
 import com.agentflow.clientservice.dto.request.ClientUpdateRequest;
 import com.agentflow.clientservice.entity.Client;
+import com.agentflow.clientservice.entity.outbox.OutboxEvent;
 import com.agentflow.clientservice.exception.NotFoundException;
 import com.agentflow.clientservice.mapper.ClientMapper;
+import com.agentflow.clientservice.mapper.OutboxMapper;
 import com.agentflow.clientservice.repository.ClientRepository;
+import com.agentflow.clientservice.repository.OutboxRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,40 +33,19 @@ import java.util.List;
 public class ClientService {
     private final ClientRepository clientRepository;
     private final ClientMapper clientMapper;
-    private final KafkaTemplate<String, ClientCreatedEvent> kafkaTemplate;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OutboxMapper outboxMapper;
+    private final OutboxRepository outboxRepository;
 
     @Transactional
     public ClientResponse create(ClientRequest clientRequest) {
         Client client = clientMapper.toEntity(clientRequest);
         Client savedClient = clientRepository.save(client);
 
-        ClientCreatedEvent event = clientMapper.toClientCreatedEvent(savedClient);
-        eventPublisher.publishEvent(event);
+        ClientCreatedEvent clientCreatedEvent = clientMapper.toClientCreatedEvent(savedClient);
+        OutboxEvent outboxEvent = outboxMapper.toEntity(clientCreatedEvent, savedClient.getId());
+        outboxRepository.save(outboxEvent);
 
         return clientMapper.toResponse(savedClient);
-    }
-
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void handleClientCreatedCommit(ClientCreatedEvent event) {
-        sendClientCreatedEvent(event);
-    }
-
-    private void sendClientCreatedEvent(ClientCreatedEvent event) {
-        String key = String.valueOf(event.clientId());
-
-        kafkaTemplate.send(KafkaProducerConfig.CLIENT_CREATED_TOPIC, key, event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("Successfully sent ClientCreatedEvent. Key: {}, Partition: {}, Offset: {}",
-                                key,
-                                result.getRecordMetadata().partition(),
-                                result.getRecordMetadata().offset());
-                    } else {
-                        log.error("Failed to send ClientCreatedEvent for Key: {}", key, ex);
-                    }
-                });
     }
 
     public ClientResponse getById(Long id) {
