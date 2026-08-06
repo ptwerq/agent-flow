@@ -1,6 +1,6 @@
 package com.agentflow.clientservice.unit;
 
-import com.agentflow.clientservice.config.KafkaProducerConfig;
+import com.agentflow.clientservice.config.KafkaConfig;
 import com.agentflow.clientservice.entity.outbox.OutboxEvent;
 import com.agentflow.clientservice.entity.outbox.OutboxEventStatus;
 import com.agentflow.clientservice.repository.OutboxRepository;
@@ -46,7 +46,7 @@ class OutboxProcessorTest {
                 .thenReturn(List.of(event));
 
         when(kafkaTemplate.send(
-                eq(KafkaProducerConfig.CLIENT_CREATED_TOPIC),
+                eq(KafkaConfig.CLIENT_CREATED_TOPIC),
                 eq("100"),
                 eq(event.getPayload())
         )).thenReturn(CompletableFuture.completedFuture(null));
@@ -58,7 +58,7 @@ class OutboxProcessorTest {
         verify(outboxRepository, times(1)).save(event);
 
         verify(kafkaTemplate, times(1)).send(
-                KafkaProducerConfig.CLIENT_CREATED_TOPIC,
+                KafkaConfig.CLIENT_CREATED_TOPIC,
                 "100",
                 "{\"clientId\": 100, \"name\": \"Ivan\"}"
         );
