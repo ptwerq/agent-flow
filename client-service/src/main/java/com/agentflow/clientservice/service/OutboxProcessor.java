@@ -1,6 +1,6 @@
 package com.agentflow.clientservice.service;
 
-import com.agentflow.clientservice.config.KafkaProducerConfig;
+import com.agentflow.clientservice.config.KafkaConfig;
 import com.agentflow.clientservice.entity.outbox.OutboxEvent;
 import com.agentflow.clientservice.entity.outbox.OutboxEventStatus;
 import com.agentflow.clientservice.repository.OutboxRepository;
@@ -29,7 +29,7 @@ public class OutboxProcessor {
         }
 
         for (var event : outboxEventList) {
-            kafkaTemplate.send(KafkaProducerConfig.CLIENT_CREATED_TOPIC,
+            kafkaTemplate.send(KafkaConfig.CLIENT_CREATED_TOPIC,
                             String.valueOf(event.getPartitionKey()),
                             event.getPayload())
                     .whenComplete((result, ex) -> {

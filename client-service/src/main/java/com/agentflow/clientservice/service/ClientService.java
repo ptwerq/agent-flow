@@ -1,12 +1,12 @@
 package com.agentflow.clientservice.service;
 
-import com.agentflow.clientservice.config.KafkaProducerConfig;
 import com.agentflow.clientservice.dto.event.ClientCreatedEvent;
 import com.agentflow.clientservice.dto.request.ClientRequest;
 import com.agentflow.clientservice.dto.response.ClientResponse;
 import com.agentflow.clientservice.dto.request.ClientStatusUpdateRequest;
 import com.agentflow.clientservice.dto.request.ClientUpdateRequest;
 import com.agentflow.clientservice.entity.Client;
+import com.agentflow.clientservice.entity.DealStatus;
 import com.agentflow.clientservice.entity.outbox.OutboxEvent;
 import com.agentflow.clientservice.exception.NotFoundException;
 import com.agentflow.clientservice.mapper.ClientMapper;
@@ -14,15 +14,9 @@ import com.agentflow.clientservice.mapper.OutboxMapper;
 import com.agentflow.clientservice.repository.ClientRepository;
 import com.agentflow.clientservice.repository.OutboxRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
@@ -46,6 +40,20 @@ public class ClientService {
         outboxRepository.save(outboxEvent);
 
         return clientMapper.toResponse(savedClient);
+    }
+
+    @Transactional
+    public void assignManager(Long clientId, Long managerId) {
+        Client client = getEntityById(clientId);
+        client.setManagerId(managerId);
+        client.setDealStatus(DealStatus.IN_PROGRESS);
+    }
+
+    @Transactional
+    public void releaseManager(Long clientId) {
+        Client client = getEntityById(clientId);
+        client.setManagerId(null);
+        client.setDealStatus(DealStatus.SUCCESS);
     }
 
     public ClientResponse getById(Long id) {
