@@ -73,15 +73,16 @@ public class ManagerService {
     @Transactional
     public void increaseLoad(Long id) {
         Manager manager = getEntityById(id);
-        Integer newLoad = manager.getCurrentLoad() + 1;
-        manager.setCurrentLoad(newLoad);
-        if (newLoad >= manager.getMaxCapacity()) {
-            manager.setStatus(ManagerStatus.BUSY);
-        }
-        else {
+        if (manager.getCurrentLoad() >= manager.getMaxCapacity()) {
             throw new ManagerCapacityExceededException("Manager capacity exceeded: " + id);
         }
+        int newLoad = manager.getCurrentLoad() + 1;
+        manager.setCurrentLoad(newLoad);
+        if (newLoad == manager.getMaxCapacity()) {
+            manager.setStatus(ManagerStatus.BUSY);
+        }
     }
+
 
     @Transactional
     public void decreaseLoad(Long id) {

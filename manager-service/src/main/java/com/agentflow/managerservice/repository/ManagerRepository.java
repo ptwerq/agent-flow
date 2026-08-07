@@ -15,7 +15,8 @@ public interface ManagerRepository extends JpaRepository<Manager, Long> {
             "WHERE m.isDeleted = false " +
             "AND m.status = 'ACTIVE' " +
             "AND m.currentLoad < m.maxCapacity " +
-            "ORDER BY m.currentLoad ASC")
+            "ORDER BY m.currentLoad ASC " +
+            "LIMIT 1")
     Optional<Manager> findLeastLoadedAvailableManager();
     Page<Manager> findAllByIsDeletedFalse(Pageable pageable);
 }
