@@ -1,3 +1,6 @@
+server:
+  port: 8081
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/agentflow_clients_db
@@ -20,14 +23,28 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
     consumer:
       group-id: client-service-group
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: true
+
+    listener:
+      ack-mode: manual_immediate
+
+
 
 
 

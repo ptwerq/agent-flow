@@ -6,9 +6,12 @@ import com.agentflow.managerservice.dto.event.ClientReleasedEvent;
 import com.agentflow.managerservice.entity.AssignmentStatus;
 import com.agentflow.managerservice.entity.ClientAssignment;
 import com.agentflow.managerservice.entity.Manager;
+import com.agentflow.managerservice.entity.outbox.OutboxEvent;
 import com.agentflow.managerservice.exception.NotFoundException;
 import com.agentflow.managerservice.mapper.ClientAssignmentMapper;
+import com.agentflow.managerservice.mapper.OutboxMapper;
 import com.agentflow.managerservice.repository.ClientAssignmentRepository;
+import com.agentflow.managerservice.repository.OutboxRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +28,10 @@ import java.time.LocalDateTime;
 public class ClientAssignmentService {
 
     private final ManagerService managerService;
-    private final KafkaTemplate<String, String> kafkaTemplate;
     private final ClientAssignmentMapper clientAssignmentMapper;
     private final ClientAssignmentRepository clientAssignmentRepository;
-    private final ObjectMapper objectMapper;
+    private final OutboxMapper outboxMapper;
+    private final OutboxRepository outboxRepository;
 
     @Transactional
     public void assignClient(Long clientId) {
@@ -43,8 +46,9 @@ public class ClientAssignmentService {
         ClientAssignment assignment = clientAssignmentMapper.toEntity(clientId, manager);
         clientAssignmentRepository.save(assignment);
 
-        ClientAssignedEvent event = new ClientAssignedEvent(clientId, manager.getId());
-        sendKafkaEvent(KafkaConfig.CLIENT_ASSIGNED_TOPIC, String.valueOf(clientId), event);
+        ClientAssignedEvent clientAssignedEvent = new ClientAssignedEvent(clientId, manager.getId());
+        OutboxEvent outboxEvent = outboxMapper.toEntity(clientAssignedEvent, clientId);
+        outboxRepository.save(outboxEvent);
 
         log.info("Client ID: {} successfully assigned to Manager ID: {}", clientId, manager.getId());
     }
@@ -62,19 +66,11 @@ public class ClientAssignmentService {
 
         managerService.decreaseLoad(assignment.getManager().getId());
 
-        ClientReleasedEvent event = new ClientReleasedEvent(clientId, assignment.getManager().getId(), releasedAt);
-        sendKafkaEvent(KafkaConfig.CLIENT_RELEASED_TOPIC, String.valueOf(clientId), event);
+        ClientReleasedEvent clientReleasedEvent = new ClientReleasedEvent(clientId, assignment.getManager().getId(), releasedAt);
+        OutboxEvent outboxEvent = outboxMapper.toEntity(clientReleasedEvent, clientId);
+        outboxRepository.save(outboxEvent);
 
         log.info("Client ID: {} released from Manager ID: {}", clientId, assignment.getManager().getId());
     }
 
-    private void sendKafkaEvent(String topic, String key, Object event) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(event);
-            kafkaTemplate.send(topic, key, jsonPayload);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize event for topic {}: {}", topic, event, e);
-            throw new RuntimeException("Error serializing Kafka event", e);
-        }
-    }
 }

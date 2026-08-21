@@ -1,10 +1,10 @@
-package com.agentflow.clientservice.service;
+package com.agentflow.managerservice.service;
 
-import com.agentflow.clientservice.config.KafkaConfig;
-import com.agentflow.clientservice.entity.outbox.OutboxEvent;
-import com.agentflow.clientservice.entity.outbox.OutboxEventStatus;
-import com.agentflow.clientservice.entity.outbox.OutboxEventType;
-import com.agentflow.clientservice.repository.OutboxRepository;
+import com.agentflow.managerservice.config.KafkaConfig;
+import com.agentflow.managerservice.entity.outbox.OutboxEvent;
+import com.agentflow.managerservice.entity.outbox.OutboxEventStatus;
+import com.agentflow.managerservice.entity.outbox.OutboxEventType;
+import com.agentflow.managerservice.repository.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,11 +17,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class OutboxProcessor {
-
     private final OutboxRepository outboxRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -65,9 +64,12 @@ public class OutboxProcessor {
     }
 
     private String resolveTopic(OutboxEventType eventType) {
-       if (eventType == OutboxEventType.CLIENT_CREATED) {
-           return KafkaConfig.CLIENT_CREATED_TOPIC;
-       }
-       return KafkaConfig.CLIENT_CREATED_TOPIC;
+        if (eventType == OutboxEventType.CLIENT_ASSIGNED) {
+            return KafkaConfig.CLIENT_ASSIGNED_TOPIC;
+        }
+        if (eventType == OutboxEventType.CLIENT_RELEASED) {
+            return KafkaConfig.CLIENT_RELEASED_TOPIC;
+        }
+        return KafkaConfig.CLIENT_ASSIGNED_TOPIC;
     }
 }

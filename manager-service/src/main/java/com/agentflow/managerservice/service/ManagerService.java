@@ -12,6 +12,7 @@ import com.agentflow.managerservice.exception.NoAvailableManagerException;
 import com.agentflow.managerservice.exception.NotFoundException;
 import com.agentflow.managerservice.mapper.ManagerMapper;
 import com.agentflow.managerservice.repository.ManagerRepository;
+import com.agentflow.managerservice.repository.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
