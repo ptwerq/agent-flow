@@ -39,10 +39,12 @@ public class Manager {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private ManagerStatus status = ManagerStatus.ACTIVE;
 
     @Column(name = "max_capacity", nullable = false)
-    private Integer maxCapacity;
+    @Builder.Default
+    private Integer maxCapacity = 10;
 
     @Column(name = "current_load", nullable = false)
     @Builder.Default
