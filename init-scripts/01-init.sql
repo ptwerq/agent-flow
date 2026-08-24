@@ -1,2 +1,3 @@
 CREATE DATABASE agentflow_clients_db;
 CREATE DATABASE agentflow_managers_db;
+CREATE DATABASE agentflow_documents_db;
