@@ -11,10 +11,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InitDocumentResponse {
-    private Long documentId;
-    private Integer version;
-    private String objectKey;
+public class PresignedPostData {
+    private Map<String, String> formData;
     private String uploadUrl;
-    private Map<String, String> uploadFormData;
 }
