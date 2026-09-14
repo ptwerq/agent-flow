@@ -22,3 +22,10 @@ minio:
   secret-key: super_secret_password
   bucket: agentflow-documents
   presigned-url-expiry: 600
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
