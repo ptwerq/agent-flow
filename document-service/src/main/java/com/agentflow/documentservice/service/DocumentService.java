@@ -1,5 +1,6 @@
 package com.agentflow.documentservice.service;
 
+import com.agentflow.documentservice.dto.event.DocumentUploadedEvent;
 import com.agentflow.documentservice.dto.request.AddVersionRequest;
 import com.agentflow.documentservice.dto.request.InitDocumentRequest;
 import com.agentflow.documentservice.dto.request.VersionStatusUpdateRequest;
@@ -9,11 +10,15 @@ import com.agentflow.documentservice.dto.response.PresignedPostData;
 import com.agentflow.documentservice.dto.response.VersionResponse;
 import com.agentflow.documentservice.entity.Document;
 import com.agentflow.documentservice.entity.DocumentVersion;
+import com.agentflow.documentservice.entity.outbox.OutboxEvent;
 import com.agentflow.documentservice.exception.NotFoundException;
+import com.agentflow.documentservice.mapper.DocumentEventMapper;
 import com.agentflow.documentservice.mapper.DocumentMapper;
 import com.agentflow.documentservice.mapper.DocumentVersionMapper;
+import com.agentflow.documentservice.mapper.OutboxMapper;
 import com.agentflow.documentservice.repository.DocumentRepository;
 import com.agentflow.documentservice.repository.DocumentVersionRepository;
+import com.agentflow.documentservice.repository.OutboxRepository;
 import io.minio.StatObjectResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +37,9 @@ public class DocumentService {
     private final MinioService minioService;
     private final DocumentMapper documentMapper;
     private final DocumentVersionMapper documentVersionMapper;
+    private final DocumentEventMapper documentEventMapper;
+    private final OutboxMapper outboxMapper;
+    private final OutboxRepository outboxRepository;
 
     @Transactional
     public InitDocumentResponse createDocument(InitDocumentRequest request) {
@@ -66,9 +74,15 @@ public class DocumentService {
     @Transactional
     public void completeUpload(Long documentId, Integer version) {
         DocumentVersion documentVersion = getDocumentVersionByDocumentIdAndVersion(documentId, version);
+        Document document = getDocumentEntityById(documentId);
+
         String objectKey = documentVersion.getObjectKey();
         StatObjectResponse metadata = minioService.getObjectMetadata(objectKey);
         documentVersion.setFileSize(metadata.size());
+
+        DocumentUploadedEvent documentUploadedEvent = documentEventMapper.toEvent(document, documentVersion);
+        OutboxEvent outboxEvent = outboxMapper.toEntity(documentUploadedEvent);
+        outboxRepository.save(outboxEvent);
     }
 
     @Transactional
