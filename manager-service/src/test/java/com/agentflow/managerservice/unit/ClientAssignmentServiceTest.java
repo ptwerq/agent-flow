@@ -1,32 +1,34 @@
-package com.agentflow.managerservice.service;
+package com.agentflow.managerservice.unit;
 
-import com.agentflow.managerservice.config.KafkaConfig;
 import com.agentflow.managerservice.dto.event.ClientAssignedEvent;
 import com.agentflow.managerservice.dto.event.ClientReleasedEvent;
 import com.agentflow.managerservice.entity.AssignmentStatus;
 import com.agentflow.managerservice.entity.ClientAssignment;
 import com.agentflow.managerservice.entity.Manager;
-import com.agentflow.managerservice.exception.NotFoundException;
+import com.agentflow.managerservice.entity.ManagerStatus;
+import com.agentflow.managerservice.entity.outbox.OutboxEvent;
+import com.agentflow.managerservice.exception.NoAvailableManagerException;
 import com.agentflow.managerservice.mapper.ClientAssignmentMapper;
+import com.agentflow.managerservice.mapper.OutboxMapper;
 import com.agentflow.managerservice.repository.ClientAssignmentRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.agentflow.managerservice.repository.OutboxRepository;
+import com.agentflow.managerservice.exception.NotFoundException;
+import com.agentflow.managerservice.service.ClientAssignmentService;
+import com.agentflow.managerservice.service.ManagerService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ClientAssignmentServiceTest {
@@ -35,120 +37,154 @@ class ClientAssignmentServiceTest {
     private ManagerService managerService;
 
     @Mock
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Mock
     private ClientAssignmentMapper clientAssignmentMapper;
 
     @Mock
     private ClientAssignmentRepository clientAssignmentRepository;
 
     @Mock
-    private ObjectMapper objectMapper;
+    private OutboxMapper outboxMapper;
+
+    @Mock
+    private OutboxRepository outboxRepository;
 
     @InjectMocks
     private ClientAssignmentService clientAssignmentService;
 
-    private final Long clientId = 100L;
-    private final Long managerId = 1L;
     private Manager manager;
     private ClientAssignment assignment;
+    private OutboxEvent outboxEvent;
 
     @BeforeEach
     void setUp() {
         manager = Manager.builder()
-                .id(managerId)
+                .id(1L)
                 .firstName("John")
                 .lastName("Doe")
+                .email("john@example.com")
+                .phone("+375291234567")
+                .status(ManagerStatus.ACTIVE)
+                .maxCapacity(10)
+                .currentLoad(2)
+                .isDeleted(false)
                 .build();
 
         assignment = ClientAssignment.builder()
-                .id(10L)
-                .clientId(clientId)
+                .id(1L)
+                .clientId(100L)
                 .manager(manager)
                 .status(AssignmentStatus.ACTIVE)
                 .build();
+
+        outboxEvent = OutboxEvent.builder()
+                .id(1L)
+                .build();
     }
 
-    @Nested
-    @DisplayName("Assign Client Tests")
-    class AssignClientTests {
+    @Test
+    void assignClient_Skips_WhenClientAlreadyAssigned() {
+        when(clientAssignmentRepository.existsByClientId(100L))
+                .thenReturn(true);
 
-        @Test
-        @DisplayName("Should successfully assign client and send Kafka event")
-        void assignClient_Success() throws JsonProcessingException {
-            when(clientAssignmentRepository.existsByClientId(clientId)).thenReturn(false);
-            when(managerService.findLeastLoadedAvailableManager()).thenReturn(manager);
-            when(clientAssignmentMapper.toEntity(clientId, manager)).thenReturn(assignment);
-            when(objectMapper.writeValueAsString(any(ClientAssignedEvent.class))).thenReturn("{}");
+        clientAssignmentService.assignClient(100L);
 
-            clientAssignmentService.assignClient(clientId);
-
-            verify(managerService).increaseLoad(managerId);
-            verify(clientAssignmentRepository).save(assignment);
-            verify(kafkaTemplate).send(eq(KafkaConfig.CLIENT_ASSIGNED_TOPIC), eq(String.valueOf(clientId)), eq("{}"));
-        }
-
-        @Test
-        @DisplayName("Should skip processing if client assignment record already exists")
-        void assignClient_DuplicateRecord_SkipsAssignment() {
-            when(clientAssignmentRepository.existsByClientId(clientId)).thenReturn(true);
-
-            clientAssignmentService.assignClient(clientId);
-
-            verify(managerService, never()).findLeastLoadedAvailableManager();
-            verify(managerService, never()).increaseLoad(anyLong());
-            verify(clientAssignmentRepository, never()).save(any());
-            verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        }
-
-        @Test
-        @DisplayName("Should throw RuntimeException when JSON serialization fails")
-        void assignClient_SerializationError_ThrowsException() throws JsonProcessingException {
-            when(clientAssignmentRepository.existsByClientId(clientId)).thenReturn(false);
-            when(managerService.findLeastLoadedAvailableManager()).thenReturn(manager);
-            when(clientAssignmentMapper.toEntity(clientId, manager)).thenReturn(assignment);
-            when(objectMapper.writeValueAsString(any(ClientAssignedEvent.class)))
-                    .thenThrow(new JsonProcessingException("Serialization error") {});
-
-            assertThatThrownBy(() -> clientAssignmentService.assignClient(clientId))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Error serializing Kafka event");
-
-            verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        }
+        verify(clientAssignmentRepository).existsByClientId(100L);
+        verify(managerService, never()).findLeastLoadedAvailableManager();
+        verify(managerService, never()).increaseLoad(1L);
+        verify(clientAssignmentRepository, never()).save(assignment);
+        verify(outboxRepository, never()).save(outboxEvent);
     }
 
-    @Nested
-    @DisplayName("Release Client Tests")
-    class ReleaseClientTests {
+    @Test
+    void assignClient_CreatesAssignmentAndOutboxEvent() {
+        when(clientAssignmentRepository.existsByClientId(100L))
+                .thenReturn(false);
+        when(managerService.findLeastLoadedAvailableManager())
+                .thenReturn(manager);
+        when(clientAssignmentMapper.toEntity(100L, manager))
+                .thenReturn(assignment);
+        when(outboxMapper.toEntity(
+                org.mockito.ArgumentMatchers.any(
+                        ClientAssignedEvent.class
+                ),
+                org.mockito.ArgumentMatchers.eq(100L)
+        )).thenReturn(outboxEvent);
 
-        @Test
-        @DisplayName("Should successfully release client and send Kafka event")
-        void releaseClient_Success() throws JsonProcessingException {
-            when(clientAssignmentRepository.findByClientIdAndStatus(clientId, AssignmentStatus.ACTIVE))
-                    .thenReturn(Optional.of(assignment));
-            when(objectMapper.writeValueAsString(any(ClientReleasedEvent.class))).thenReturn("{}");
+        clientAssignmentService.assignClient(100L);
 
-            clientAssignmentService.releaseClient(clientId);
+        verify(managerService).findLeastLoadedAvailableManager();
+        verify(managerService).increaseLoad(1L);
+        verify(clientAssignmentMapper).toEntity(100L, manager);
+        verify(clientAssignmentRepository).save(assignment);
+        verify(outboxRepository).save(outboxEvent);
+    }
 
-            verify(clientAssignmentRepository).save(assignment);
-            verify(managerService).decreaseLoad(managerId);
-            verify(kafkaTemplate).send(eq(KafkaConfig.CLIENT_RELEASED_TOPIC), eq(String.valueOf(clientId)), eq("{}"));
-        }
+    @Test
+    void assignClient_DoesNotCreateAssignment_WhenNoManagerAvailable() {
+        when(clientAssignmentRepository.existsByClientId(100L))
+                .thenReturn(false);
 
-        @Test
-        @DisplayName("Should throw NotFoundException when active assignment not found")
-        void releaseClient_NotFound_ThrowsException() {
-            when(clientAssignmentRepository.findByClientIdAndStatus(clientId, AssignmentStatus.ACTIVE))
-                    .thenReturn(Optional.empty());
+        when(managerService.findLeastLoadedAvailableManager())
+                .thenThrow(new NoAvailableManagerException(
+                        "No available manager found"
+                ));
 
-            assertThatThrownBy(() -> clientAssignmentService.releaseClient(clientId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessageContaining("Active assignment not found for client ID: " + clientId);
+        assertThrows(
+                NoAvailableManagerException.class,
+                () -> clientAssignmentService.assignClient(100L)
+        );
 
-            verify(managerService, never()).decreaseLoad(anyLong());
-            verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
-        }
+        verify(managerService).findLeastLoadedAvailableManager();
+        verify(managerService, never()).increaseLoad(1L);
+        verify(clientAssignmentRepository, never()).save(assignment);
+        verify(outboxRepository, never()).save(outboxEvent);
+    }
+
+    @Test
+    void releaseClient_CompletesAssignmentAndCreatesOutboxEvent() {
+        LocalDateTime before = LocalDateTime.now();
+
+        when(clientAssignmentRepository
+                .findByClientIdAndStatus(100L, AssignmentStatus.ACTIVE))
+                .thenReturn(Optional.of(assignment));
+
+        when(outboxMapper.toEntity(
+                org.mockito.ArgumentMatchers.any(
+                        ClientReleasedEvent.class
+                ),
+                org.mockito.ArgumentMatchers.eq(100L)
+        )).thenReturn(outboxEvent);
+
+        clientAssignmentService.releaseClient(100L);
+
+        LocalDateTime after = LocalDateTime.now();
+
+        assertEquals(AssignmentStatus.COMPLETED, assignment.getStatus());
+        assertEquals(1L, assignment.getManager().getId());
+
+        assertTrue(!assignment.getReleasedAt().isBefore(before)
+                && !assignment.getReleasedAt().isAfter(after));
+
+        verify(clientAssignmentRepository).save(assignment);
+        verify(managerService).decreaseLoad(1L);
+        verify(outboxRepository).save(outboxEvent);
+    }
+
+    @Test
+    void releaseClient_ThrowsException_WhenActiveAssignmentNotFound() {
+        when(clientAssignmentRepository
+                .findByClientIdAndStatus(100L, AssignmentStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                NotFoundException.class,
+                () -> clientAssignmentService.releaseClient(100L)
+        );
+
+        verify(clientAssignmentRepository)
+                .findByClientIdAndStatus(100L, AssignmentStatus.ACTIVE);
+
+        verify(managerService, never()).decreaseLoad(1L);
+        verify(outboxRepository, never()).save(outboxEvent);
     }
 }

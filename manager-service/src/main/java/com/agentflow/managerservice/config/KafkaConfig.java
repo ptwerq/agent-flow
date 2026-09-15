@@ -3,6 +3,7 @@ package com.agentflow.managerservice.config;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,24 +48,34 @@ public class KafkaConfig {
 
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
 
+        props.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE,
+                "com.agentflow.managerservice.dto.event.ClientCreatedEvent");
+
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            KafkaTemplate<String, Object> kafkaTemplate
+            KafkaTemplate<String, byte[]> dltKafkaTemplate
     ) {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
+
         factory.setConsumerFactory(consumerFactory());
 
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.getContainerProperties()
+                .setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
-                new DeadLetterPublishingRecoverer(kafkaTemplate),
+                new DeadLetterPublishingRecoverer(dltKafkaTemplate),
                 new FixedBackOff(1000L, 3)
         );
-        errorHandler.addNotRetryableExceptions(NullPointerException.class, IllegalArgumentException.class);
+
+        errorHandler.addNotRetryableExceptions(
+                NullPointerException.class,
+                IllegalArgumentException.class
+        );
+
         factory.setCommonErrorHandler(errorHandler);
 
         return factory;
@@ -78,6 +89,33 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 
         return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    public ProducerFactory<String, byte[]> dltProducerFactory() {
+        Map<String, Object> props = new HashMap<>();
+
+        props.put(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                bootstrapServers
+        );
+
+        props.put(
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                StringSerializer.class
+        );
+
+        props.put(
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                ByteArraySerializer.class
+        );
+
+        return new DefaultKafkaProducerFactory<>(props);
+    }
+
+    @Bean
+    public KafkaTemplate<String, byte[]> dltKafkaTemplate() {
+        return new KafkaTemplate<>(dltProducerFactory());
     }
 
     @Bean
