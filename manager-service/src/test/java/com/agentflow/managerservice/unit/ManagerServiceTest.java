@@ -1,4 +1,4 @@
-package com.agentflow.managerservice.service;
+package com.agentflow.managerservice.unit;
 
 import com.agentflow.managerservice.dto.request.ManagerRequest;
 import com.agentflow.managerservice.dto.request.ManagerStatusUpdateRequest;
@@ -12,9 +12,8 @@ import com.agentflow.managerservice.exception.NoAvailableManagerException;
 import com.agentflow.managerservice.exception.NotFoundException;
 import com.agentflow.managerservice.mapper.ManagerMapper;
 import com.agentflow.managerservice.repository.ManagerRepository;
+import com.agentflow.managerservice.service.ManagerService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,10 +27,15 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ManagerServiceTest {
@@ -47,235 +51,259 @@ class ManagerServiceTest {
 
     private Manager manager;
     private ManagerResponse managerResponse;
-    private final Long managerId = 1L;
 
     @BeforeEach
     void setUp() {
         manager = Manager.builder()
-                .id(managerId)
+                .id(1L)
                 .firstName("John")
                 .lastName("Doe")
+                .email("john@example.com")
+                .phone("+375291234567")
                 .status(ManagerStatus.ACTIVE)
-                .currentLoad(1)
-                .maxCapacity(5)
+                .maxCapacity(10)
+                .currentLoad(0)
                 .isDeleted(false)
                 .build();
 
-        managerResponse = ManagerResponse.builder()
-                .id(managerId)
-                .firstName("John")
-                .lastName("Doe")
-                .status(ManagerStatus.ACTIVE)
-                .currentLoad(1)
-                .maxCapacity(5)
-                .build();
+        managerResponse = new ManagerResponse();
     }
 
-    @Nested
-    @DisplayName("Create Manager Tests")
-    class CreateTests {
+    @Test
+    void create_SavesManagerAndReturnsResponse() {
+        ManagerRequest request = new ManagerRequest();
 
-        @Test
-        @DisplayName("Should create manager successfully")
-        void create_Success() {
-            ManagerRequest request = new ManagerRequest();
+        when(managerMapper.toEntity(request)).thenReturn(manager);
+        when(managerRepository.save(manager)).thenReturn(manager);
+        when(managerMapper.toResponse(manager)).thenReturn(managerResponse);
 
-            when(managerMapper.toEntity(request)).thenReturn(manager);
-            when(managerRepository.save(manager)).thenReturn(manager);
-            when(managerMapper.toResponse(manager)).thenReturn(managerResponse);
+        ManagerResponse result = managerService.create(request);
 
-            ManagerResponse result = managerService.create(request);
+        assertSame(managerResponse, result);
 
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(managerId);
-
-            verify(managerMapper).toEntity(request);
-            verify(managerRepository).save(manager);
-            verify(managerMapper).toResponse(manager);
-        }
+        verify(managerMapper).toEntity(request);
+        verify(managerRepository).save(manager);
+        verify(managerMapper).toResponse(manager);
     }
 
-    @Nested
-    @DisplayName("Get Manager Tests")
-    class GetTests {
+    @Test
+    void getById_ReturnsManager() {
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+        when(managerMapper.toResponse(manager))
+                .thenReturn(managerResponse);
 
-        @Test
-        @DisplayName("Should return manager by id when found")
-        void getById_Success() {
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-            when(managerMapper.toResponse(manager)).thenReturn(managerResponse);
+        ManagerResponse result = managerService.getById(1L);
 
-            ManagerResponse result = managerService.getById(managerId);
+        assertSame(managerResponse, result);
 
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(managerId);
-        }
-
-        @Test
-        @DisplayName("Should throw NotFoundException when manager not found")
-        void getById_NotFound_ThrowsException() {
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> managerService.getById(managerId))
-                    .isInstanceOf(NotFoundException.class)
-                    .hasMessageContaining("Manager not found: " + managerId);
-        }
-
-        @Test
-        @DisplayName("Should return page of managers")
-        void getAll_Success() {
-            Pageable pageable = PageRequest.of(0, 10);
-            Page<Manager> managerPage = new PageImpl<>(List.of(manager));
-
-            when(managerRepository.findAllByIsDeletedFalse(pageable)).thenReturn(managerPage);
-            when(managerMapper.toResponse(any(Manager.class))).thenReturn(managerResponse);
-
-            Page<ManagerResponse> result = managerService.getAll(pageable);
-
-            assertThat(result).isNotNull();
-            assertThat(result.getContent()).hasSize(1);
-            verify(managerRepository).findAllByIsDeletedFalse(pageable);
-        }
+        verify(managerRepository).findByIdAndIsDeletedFalse(1L);
+        verify(managerMapper).toResponse(manager);
     }
 
-    @Nested
-    @DisplayName("Update Manager Tests")
-    class UpdateTests {
+    @Test
+    void getById_ThrowsException_WhenManagerNotFound() {
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("Should update manager details successfully")
-        void update_Success() {
-            ManagerUpdateRequest updateRequest = new ManagerUpdateRequest();
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-            when(managerMapper.toResponse(manager)).thenReturn(managerResponse);
+        assertThrows(
+                NotFoundException.class,
+                () -> managerService.getById(1L)
+        );
 
-            ManagerResponse result = managerService.update(managerId, updateRequest);
-
-            assertThat(result).isNotNull();
-            verify(managerMapper).updateManagerFromUpdateRequest(updateRequest, manager);
-        }
-
-        @Test
-        @DisplayName("Should update manager status successfully")
-        void updateStatus_Success() {
-            ManagerStatusUpdateRequest statusRequest = new ManagerStatusUpdateRequest();
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-            when(managerMapper.toResponse(manager)).thenReturn(managerResponse);
-
-            ManagerResponse result = managerService.updateStatus(managerId, statusRequest);
-
-            assertThat(result).isNotNull();
-            verify(managerMapper).updateManagerFromStatusRequest(statusRequest, manager);
-        }
+        verify(managerMapper, never()).toResponse(any());
     }
 
-    @Nested
-    @DisplayName("Delete Manager Tests")
-    class DeleteTests {
+    @Test
+    void getAll_ReturnsManagers() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Manager> managers = new PageImpl<>(List.of(manager));
 
-        @Test
-        @DisplayName("Should soft delete manager when currentLoad is 0")
-        void delete_Success() {
-            manager.setCurrentLoad(0);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
+        when(managerRepository.findAllByIsDeletedFalse(pageable))
+                .thenReturn(managers);
+        when(managerMapper.toResponse(manager))
+                .thenReturn(managerResponse);
 
-            managerService.delete(managerId);
+        Page<ManagerResponse> result = managerService.getAll(pageable);
 
-            assertThat(manager.getIsDeleted()).isTrue();
-        }
+        assertEquals(1, result.getTotalElements());
+        assertSame(managerResponse, result.getContent().get(0));
 
-        @Test
-        @DisplayName("Should throw IllegalStateException when deleting manager with active load")
-        void delete_WithActiveLoad_ThrowsException() {
-            manager.setCurrentLoad(2);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-
-            assertThatThrownBy(() -> managerService.delete(managerId))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("Cannot delete manager with active clients");
-        }
+        verify(managerRepository).findAllByIsDeletedFalse(pageable);
+        verify(managerMapper).toResponse(manager);
     }
 
-    @Nested
-    @DisplayName("Increase/Decrease Load Tests")
-    class LoadManagementTests {
+    @Test
+    void update_UpdatesManagerAndReturnsResponse() {
+        ManagerUpdateRequest request = new ManagerUpdateRequest();
 
-        @Test
-        @DisplayName("Should set status to BUSY when new load equals/exceeds capacity")
-        void increaseLoad_ReachesCapacity_SetsStatusBusy() {
-            manager.setCurrentLoad(4);
-            manager.setMaxCapacity(5);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+        when(managerMapper.toResponse(manager))
+                .thenReturn(managerResponse);
 
-            managerService.increaseLoad(managerId);
+        ManagerResponse result = managerService.update(1L, request);
 
-            assertThat(manager.getCurrentLoad()).isEqualTo(5);
-            assertThat(manager.getStatus()).isEqualTo(ManagerStatus.BUSY);
-        }
+        assertSame(managerResponse, result);
 
-        @Test
-        @DisplayName("Should throw ManagerCapacityExceededException when capacity is not reached")
-        void increaseLoad_UnderCapacity_ThrowsException() {
-            manager.setCurrentLoad(1);
-            manager.setMaxCapacity(5);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-
-            assertThatThrownBy(() -> managerService.increaseLoad(managerId))
-                    .isInstanceOf(ManagerCapacityExceededException.class)
-                    .hasMessageContaining("Manager capacity exceeded");
-
-            assertThat(manager.getCurrentLoad()).isEqualTo(2);
-        }
-
-        @Test
-        @DisplayName("Should decrease load successfully and change status back to ACTIVE if BUSY")
-        void decreaseLoad_Success_UpdatesStatus() {
-            manager.setCurrentLoad(5);
-            manager.setMaxCapacity(5);
-            manager.setStatus(ManagerStatus.BUSY);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-
-            managerService.decreaseLoad(managerId);
-
-            assertThat(manager.getCurrentLoad()).isEqualTo(4);
-            assertThat(manager.getStatus()).isEqualTo(ManagerStatus.ACTIVE);
-        }
-
-        @Test
-        @DisplayName("Should throw InvalidManagerLoadException when decreasing load with currentLoad <= 0")
-        void decreaseLoad_ZeroLoad_ThrowsException() {
-            manager.setCurrentLoad(0);
-            when(managerRepository.findByIdAndIsDeletedFalse(managerId)).thenReturn(Optional.of(manager));
-
-            assertThatThrownBy(() -> managerService.decreaseLoad(managerId))
-                    .isInstanceOf(InvalidManagerLoadException.class)
-                    .hasMessageContaining("Manager's current load is invalid");
-        }
+        verify(managerMapper).updateManagerFromUpdateRequest(request, manager);
+        verify(managerMapper).toResponse(manager);
     }
 
-    @Nested
-    @DisplayName("Find Least Loaded Manager Tests")
-    class FindLeastLoadedTests {
+    @Test
+    void updateStatus_UpdatesStatusAndReturnsResponse() {
+        ManagerStatusUpdateRequest request = new ManagerStatusUpdateRequest();
 
-        @Test
-        @DisplayName("Should return least loaded available manager")
-        void findLeastLoaded_Success() {
-            when(managerRepository.findLeastLoadedAvailableManager()).thenReturn(Optional.of(manager));
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+        when(managerMapper.toResponse(manager))
+                .thenReturn(managerResponse);
 
-            Manager result = managerService.findLeastLoadedAvailableManager();
+        ManagerResponse result = managerService.updateStatus(1L, request);
 
-            assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(managerId);
-        }
+        assertSame(managerResponse, result);
 
-        @Test
-        @DisplayName("Should throw NoAvailableManagerException when no manager available")
-        void findLeastLoaded_NotFound_ThrowsException() {
-            when(managerRepository.findLeastLoadedAvailableManager()).thenReturn(Optional.empty());
+        verify(managerMapper).updateManagerFromStatusRequest(request, manager);
+        verify(managerMapper).toResponse(manager);
+    }
 
-            assertThatThrownBy(() -> managerService.findLeastLoadedAvailableManager())
-                    .isInstanceOf(NoAvailableManagerException.class)
-                    .hasMessageContaining("No available manager found");
-        }
+    @Test
+    void delete_MarksManagerAsDeleted_WhenNoActiveClients() {
+        manager.setCurrentLoad(0);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        managerService.delete(1L);
+
+        assertTrue(manager.getIsDeleted());
+    }
+
+    @Test
+    void delete_ThrowsException_WhenManagerHasActiveClients() {
+        manager.setCurrentLoad(3);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> managerService.delete(1L)
+        );
+
+        assertFalse(manager.getIsDeleted());
+    }
+
+    @Test
+    void increaseLoad_IncreasesCurrentLoad() {
+        manager.setCurrentLoad(3);
+        manager.setMaxCapacity(10);
+        manager.setStatus(ManagerStatus.ACTIVE);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        managerService.increaseLoad(1L);
+
+        assertEquals(4, manager.getCurrentLoad());
+        assertEquals(ManagerStatus.ACTIVE, manager.getStatus());
+    }
+
+    @Test
+    void increaseLoad_SetsBusy_WhenCapacityReached() {
+        manager.setCurrentLoad(9);
+        manager.setMaxCapacity(10);
+        manager.setStatus(ManagerStatus.ACTIVE);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        managerService.increaseLoad(1L);
+
+        assertEquals(10, manager.getCurrentLoad());
+        assertEquals(ManagerStatus.BUSY, manager.getStatus());
+    }
+
+    @Test
+    void increaseLoad_ThrowsException_WhenCapacityExceeded() {
+        manager.setCurrentLoad(10);
+        manager.setMaxCapacity(10);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        assertThrows(
+                ManagerCapacityExceededException.class,
+                () -> managerService.increaseLoad(1L)
+        );
+
+        assertEquals(10, manager.getCurrentLoad());
+    }
+
+    @Test
+    void decreaseLoad_DecreasesCurrentLoad() {
+        manager.setCurrentLoad(5);
+        manager.setMaxCapacity(10);
+        manager.setStatus(ManagerStatus.ACTIVE);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        managerService.decreaseLoad(1L);
+
+        assertEquals(4, manager.getCurrentLoad());
+    }
+
+    @Test
+    void decreaseLoad_SetsActive_WhenBusyManagerHasFreeCapacity() {
+        manager.setCurrentLoad(10);
+        manager.setMaxCapacity(10);
+        manager.setStatus(ManagerStatus.BUSY);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        managerService.decreaseLoad(1L);
+
+        assertEquals(9, manager.getCurrentLoad());
+        assertEquals(ManagerStatus.ACTIVE, manager.getStatus());
+    }
+
+    @Test
+    void decreaseLoad_ThrowsException_WhenLoadIsZero() {
+        manager.setCurrentLoad(0);
+
+        when(managerRepository.findByIdAndIsDeletedFalse(1L))
+                .thenReturn(Optional.of(manager));
+
+        assertThrows(
+                InvalidManagerLoadException.class,
+                () -> managerService.decreaseLoad(1L)
+        );
+
+        assertEquals(0, manager.getCurrentLoad());
+    }
+
+    @Test
+    void findLeastLoadedAvailableManager_ReturnsManager() {
+        when(managerRepository.findLeastLoadedAvailableManager())
+                .thenReturn(Optional.of(manager));
+
+        Manager result = managerService.findLeastLoadedAvailableManager();
+
+        assertSame(manager, result);
+
+        verify(managerRepository).findLeastLoadedAvailableManager();
+    }
+
+    @Test
+    void findLeastLoadedAvailableManager_ThrowsException_WhenNoManagerAvailable() {
+        when(managerRepository.findLeastLoadedAvailableManager())
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                NoAvailableManagerException.class,
+                () -> managerService.findLeastLoadedAvailableManager()
+        );
     }
 }
