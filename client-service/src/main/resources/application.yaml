@@ -16,6 +16,13 @@ spring:
       hibernate:
         format_sql: true
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
   flyway:
     enabled: true
     baseline-on-migrate: true
