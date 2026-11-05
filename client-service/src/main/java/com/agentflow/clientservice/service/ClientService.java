@@ -14,6 +14,10 @@ import com.agentflow.clientservice.mapper.OutboxMapper;
 import com.agentflow.clientservice.repository.ClientRepository;
 import com.agentflow.clientservice.repository.OutboxRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -56,11 +60,19 @@ public class ClientService {
         client.setDealStatus(DealStatus.SUCCESS);
     }
 
+    @Cacheable(
+            value = "client",
+            key = "#id"
+    )
     public ClientResponse getById(Long id) {
         Client client = getEntityById(id);
         return clientMapper.toResponse(client);
     }
 
+    @Cacheable(
+            value = "clients-lists",
+            key = "'all'"
+    )
     public List<ClientResponse> getAll() {
         return clientRepository.findAllByIsDeletedFalse()
                 .stream()
@@ -69,12 +81,24 @@ public class ClientService {
     }
 
     @Transactional
+    @Caching( evict = {
+            @CacheEvict(value = "client", key = "#id"),
+            @CacheEvict(value = "clients-lists", allEntries = true)
+    })
     public void delete(Long id) {
         Client client = getEntityById(id);
         client.setDeleted(true);
     }
 
     @Transactional
+    @CacheEvict(
+            value = "clients-lists",
+            allEntries = true
+    )
+    @CachePut(
+            value = "client",
+            key = "#id"
+    )
     public ClientResponse update(Long id,
                                  ClientUpdateRequest clientUpdateRequest) {
         Client client = getEntityById(id);
@@ -83,6 +107,14 @@ public class ClientService {
     }
 
     @Transactional
+    @CacheEvict(
+            value = "clients-lists",
+            allEntries = true
+    )
+    @CachePut(
+            value = "client",
+            key = "#id"
+    )
     public ClientResponse updateStatus(Long id,
                                        ClientStatusUpdateRequest clientStatusUpdateRequest) {
         Client client = getEntityById(id);
