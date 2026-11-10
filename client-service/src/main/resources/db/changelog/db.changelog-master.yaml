@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changeset/V1__init_clients_table.sql
+  - include:
+      file: db/changelog/changeset/V2__create_outbox_events_table.sql

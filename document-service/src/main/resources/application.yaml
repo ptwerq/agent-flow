@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/agentflow_clients_db
+    url: jdbc:postgresql://localhost:5432/agentflow_documents_db
     username: user
     password: password
     driver-class-name: org.postgresql.Driver
